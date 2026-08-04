@@ -9,8 +9,8 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Upload folder
-const uploadDir = './uploads';
+// Upload folder (Vercel serverless mein /tmp use karein)
+const uploadDir = '/tmp/uploads';
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
@@ -28,10 +28,10 @@ const storage = multer.diskStorage({
 
 const upload = multer({ 
   storage: storage,
-  limits: { fileSize: 100 * 1024 * 1024 }
+  limits: { fileSize: 100 * 1024 * 1024 } // 100MB limit
 });
 
-// Frontend page (Simplified)
+// Frontend page
 app.get('/', (req, res) => {
   res.send(`
     <!DOCTYPE html>
@@ -59,7 +59,11 @@ app.get('/', (req, res) => {
           width: 90%;
           border: 1px solid #ff6b00;
         }
-        h2 { color: #ff6b00; margin-bottom: 20px; font-size: 1.8rem; }
+        h2 {
+          color: #ff6b00;
+          margin-bottom: 20px;
+          font-size: 1.8rem;
+        }
         .drop-zone {
           border: 2px dashed #333;
           border-radius: 12px;
@@ -68,8 +72,13 @@ app.get('/', (req, res) => {
           cursor: pointer;
           transition: 0.3s;
         }
-        .drop-zone:hover { border-color: #ff6b00; background: rgba(255,107,0,0.05); }
-        input[type="file"] { display: none; }
+        .drop-zone:hover {
+          border-color: #ff6b00;
+          background: rgba(255,107,0,0.05);
+        }
+        input[type="file"] {
+          display: none;
+        }
         button {
           background: #ff6b00;
           border: none;
@@ -82,7 +91,10 @@ app.get('/', (req, res) => {
           transition: 0.3s;
           width: 100%;
         }
-        button:hover { background: #ff8c38; transform: scale(1.02); }
+        button:hover {
+          background: #ff8c38;
+          transform: scale(1.02);
+        }
         #result {
           margin-top: 20px;
           padding: 12px;
@@ -91,24 +103,41 @@ app.get('/', (req, res) => {
           word-break: break-all;
           display: none;
         }
-        #result a { color: #ff6b00; text-decoration: none; }
-        #fileInfo { color: #0f0; font-size: 0.9rem; margin: 10px 0; }
-        .loading { display: none; color: #ff6b00; margin: 10px 0; }
+        #result a {
+          color: #ff6b00;
+          text-decoration: none;
+        }
+        #result a:hover {
+          text-decoration: underline;
+        }
+        .loading {
+          display: none;
+          color: #ff6b00;
+          margin: 10px 0;
+        }
+        #fileInfo {
+          color: #0f0;
+          font-size: 0.9rem;
+          margin: 10px 0;
+        }
       </style>
     </head>
     <body>
       <div class="container">
         <h2>📤 Upload Video</h2>
         <p style="color:#888;margin-bottom:16px;">Upload your video and get direct link</p>
+        
         <div class="drop-zone" id="dropZone">
           <p style="font-size:2rem;margin-bottom:8px;">📁</p>
           <p>Click or drag & drop video here</p>
           <p style="color:#666;font-size:0.8rem;margin-top:8px;">MP4, MOV up to 100MB</p>
         </div>
+        
         <input type="file" id="fileInput" accept="video/*">
         <div id="fileInfo"></div>
+        
         <button id="uploadBtn">⬆ Upload Video</button>
-        <div class="loading" id="loading">⏳ Uploading...</div>
+        <div class="loading" id="loading">⏳ Uploading... Please wait</div>
         <div id="result"></div>
       </div>
 
@@ -123,6 +152,7 @@ app.get('/', (req, res) => {
         let selectedFile = null;
 
         dropZone.addEventListener('click', () => fileInput.click());
+
         dropZone.addEventListener('dragover', (e) => {
           e.preventDefault();
           dropZone.style.borderColor = '#ff6b00';
@@ -170,13 +200,7 @@ app.get('/', (req, res) => {
               body: formData
             });
 
-            const text = await response.text();
-            let data;
-            try {
-              data = JSON.parse(text);
-            } catch (e) {
-              throw new Error('Server returned: ' + text.substring(0, 50));
-            }
+            const data = await response.json();
 
             if (response.ok && data.url) {
               result.innerHTML = '✅ <strong>Link:</strong><br><a href="' + data.url + '" target="_blank">' + data.url + '</a>';
@@ -209,7 +233,6 @@ app.post('/upload', upload.single('file'), (req, res) => {
       return res.status(400).json({ error: 'No file uploaded' });
     }
     
-    // Fixed URL generation
     const baseUrl = process.env.VERCEL_URL 
       ? `https://${process.env.VERCEL_URL}` 
       : `${req.protocol}://${req.get('host')}`;
